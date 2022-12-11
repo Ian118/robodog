@@ -25,7 +25,7 @@ class leg
     float m_x, m_y, m_z;
     Adafruit_PWMServoDriver *m_pwm;
     // temporary variables
-    float m_d2, m_c1, m_c2, m_c3, m_servo1, m_servo2, m_servo3;
+    float m_d2, m_servo1, m_servo2, m_servo3;
 
 public:
     leg(struct servo_t shoulder, struct servo_t upper_leg, struct servo_t lower_leg, Adafruit_PWMServoDriver *pwm, float upper_leg_len, float lower_leg_len, float foot_radius, float shoulder_offset);

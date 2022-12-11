@@ -56,8 +56,6 @@ void setup()
   pwm.setOscillatorFrequency(27000000);
   pwm.setPWMFreq(50);
 
-  Serial.println(WiFi.macAddress());
-
   // xTaskCreatePinnedToCore(runServer, "WiFi Task", 10000, NULL, 1, &wifiTask, 0);
   // xTaskCreate(runGyro, "Gyro Task", 10000, NULL, 1, &gyroTask);
   xTaskCreate(runPWM, "PWM Task", 10000, NULL, 2, &pwmTask);
@@ -113,16 +111,20 @@ void runGyro(void *args)
     switch (bno08x_value.sensorId)
     {
     case SH2_ROTATION_VECTOR:
-      sh2_RotationVectorWAcc r = bno08x_value.un.rotationVector;
+      sh2_RotationVectorWAcc q = bno08x_value.un.rotationVector;
       // Serial.print("Quaternion: ");
-      // Serial.print(r.real);
+      // Serial.print(q.real);
       // Serial.print(", ");
-      // Serial.print(r.i);
+      // Serial.print(q.i);
       // Serial.print(", ");
-      // Serial.print(r.j);
+      // Serial.print(q.j);
       // Serial.print(", ");
-      // Serial.println(r.k);
+      // Serial.println(q.k);
 
+      float roll = 2.0f * atan2f(q.real * q.i + q.j * q.k, 1.0f - 2.0f * (q.i * q.i + q.j * q.j));
+      float sinp = 2.0f * (q.real * q.j - q.k * q.i);
+      float pitch = abs(sinp) >= 1 ? copysignf(M_PI_2, sinp) : asinf(sinp);
+      float yaw = atan2f(q.real * q.k + q.i * q.j, 1.0f - 2.0f * (q.j * q.j + q.k * q.k));
       // float roll = atan2(2 * (r.real * r.i + r.j * r.k), 1 - 2 * (r.i * r.i + r.j * r.j));
       // Serial.print(roll / M_PI);
       // Serial.println("PI");
@@ -165,7 +167,7 @@ void runPWM(void *args)
     for (leg cur_leg : legs)
     {
       t = (float)((current_time + i * cycle_time / 4U) % cycle_time) / cycle_time;
-      x = -path_radius * cosf(2 * M_PI * t);
+      x = path_radius * cosf(2 * M_PI * t);
       z = .095f - abs(path_radius) * 0.5f * (sinf(2 * M_PI * t) - 0.25f * cosf(4 * M_PI * t) + 0.75f);
       y = SHOULDER_OFFSET_M;
       if (i == 0 || i == 3)

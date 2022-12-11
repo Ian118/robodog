@@ -16,26 +16,12 @@ void leg::move_to(float x, float y, float z)
     z -= m_foot_radius;
     // Calculate y first, then x and z
     m_servo1 = atanf(z / y) - acosf(m_shoulder_offest / sqrtf(z * z + y * y));
-
+    // Change z since y changed the height
     z = sqrtf(z * z + y * y - m_shoulder_offest * m_shoulder_offest);
-
-    m_d2 = x * x + z * z; // Distance b/w circles squared (for efficiency)
-    m_c1 = m_upper_leg_len * m_upper_leg_len - m_lower_leg_len * m_lower_leg_len + m_d2;
-    m_c2 = m_c1 / (2.0 * m_d2);
-    if (4 * m_upper_leg_len * m_upper_leg_len >= m_c1 * m_c1 / m_d2) // Is there a solution? To optimize later
-    {
-        m_c3 = sqrtf(4 * m_upper_leg_len * m_upper_leg_len - m_c1 * m_c1 / m_d2) / (2 * sqrtf(m_d2));
-        m_servo2 = -atanf((m_c2 * z + m_c3 * x) / (m_c2 * x - m_c3 * z));
-        m_servo3 = M_PI - acosf((m_upper_leg_len * m_upper_leg_len + m_lower_leg_len * m_lower_leg_len - m_d2) / (2.0 * m_upper_leg_len * m_lower_leg_len));
-        m_pwm->setPWM(m_shoulder.port, 0, position_to_pulse(m_servo1, m_shoulder));
-        m_pwm->setPWM(m_upper_leg.port, 0, position_to_pulse(-m_servo2, m_upper_leg));
-        m_pwm->setPWM(m_lower_leg.port, 0, position_to_pulse(m_servo3, m_lower_leg));
-    }
-
-    // else
-    // {
-    //     m_pwm->setPWM(m_upper_leg.port, 0, position_to_pulse(0, m_upper_leg));
-    //     m_pwm->setPWM(m_lower_leg.port, 0, position_to_pulse(0, m_lower_leg));
-    //     m_pwm->setPWM(m_shoulder.port, 0, position_to_pulse(0, m_shoulder));
-    // }
+    m_d2 = x * x + z * z;
+    m_servo2 = atan2f(z, x) - acosf((m_upper_leg_len * m_upper_leg_len + m_d2 - m_lower_leg_len * m_lower_leg_len) / (2.0 * m_upper_leg_len * sqrtf(m_d2)));
+    m_servo3 = M_PI - acosf((m_upper_leg_len * m_upper_leg_len + m_lower_leg_len * m_lower_leg_len - m_d2) / (2.0 * m_upper_leg_len * m_lower_leg_len));
+    m_pwm->setPWM(m_shoulder.port, 0, position_to_pulse(m_servo1, m_shoulder));
+    m_pwm->setPWM(m_upper_leg.port, 0, position_to_pulse(-m_servo2, m_upper_leg));
+    m_pwm->setPWM(m_lower_leg.port, 0, position_to_pulse(m_servo3, m_lower_leg));
 }
