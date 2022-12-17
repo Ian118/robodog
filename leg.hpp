@@ -1,9 +1,11 @@
-#pragma once
+#ifndef LEG_HPP
+#define LEG_HPP
 
 #define MIN(X, Y) (X < Y ? X : Y)
 #define MAX(X, Y) (X > Y ? X : Y)
 
 #include <Adafruit_PWMServoDriver.h>
+// #include "gyro.hpp"
 
 struct servo_t
 {
@@ -31,4 +33,6 @@ public:
     leg(struct servo_t shoulder, struct servo_t upper_leg, struct servo_t lower_leg, Adafruit_PWMServoDriver *pwm, float upper_leg_len, float lower_leg_len, float foot_radius, float shoulder_offset);
 
     void move_to(float x, float y, float z);
+    // void move_to(quaternion q);
 };
+#endif

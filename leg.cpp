@@ -1,4 +1,4 @@
-#include "leg.h"
+#include "leg.hpp"
 
 unsigned position_to_pulse(float pos, struct servo_t servo)
 {
@@ -15,7 +15,7 @@ void leg::move_to(float x, float y, float z)
     m_x = x, m_y = y, m_z = z;
     z -= m_foot_radius;
     // Calculate y first, then x and z
-    m_servo1 = atanf(z / y) - acosf(m_shoulder_offest / sqrtf(z * z + y * y));
+    m_servo1 = atan2f(z, y) - acosf(m_shoulder_offest / sqrtf(z * z + y * y));
     // Change z since y changed the height
     z = sqrtf(z * z + y * y - m_shoulder_offest * m_shoulder_offest);
     m_d2 = x * x + z * z;
@@ -25,3 +25,8 @@ void leg::move_to(float x, float y, float z)
     m_pwm->setPWM(m_upper_leg.port, 0, position_to_pulse(-m_servo2, m_upper_leg));
     m_pwm->setPWM(m_lower_leg.port, 0, position_to_pulse(m_servo3, m_lower_leg));
 }
+
+// void leg::move_to(quaternion q)
+// {
+//     move_to(q.i, q.j, q.k);
+// }
