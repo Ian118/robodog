@@ -30,7 +30,7 @@ float fwd;
 // #define SERVO_TESTING
 
 leg right_front = {(servo_t){9, 248 - 180, 248 + 180, M_PI_2, -M_PI_2}, (servo_t){10, 456 - 360, 456, -M_PI_2, M_PI_2}, (servo_t){11, 458 - 360, 458, M_PI, 0}},
-    left_front = {(servo_t){6, 272 - 180, 272 + 180, M_PI_2, -M_PI_2}, (servo_t){7, 96, 96 + 360, M_PI_2, -M_PI_2}, (servo_t){8, 100, 100 + 360, 0, M_PI}},
+    left_front = {(servo_t){6, 272 - 180, 272 + 180, M_PI_2, -M_PI_2}, (servo_t){7, 64, 64 + 360, M_PI_2, -M_PI_2}, (servo_t){8, 96, 96 + 360, 0, M_PI}},
     right_back = {(servo_t){3, 220 - 180, 220 + 180, -M_PI_2, M_PI_2}, (servo_t){4, 430 - 360, 430, -M_PI_2, M_PI_2}, (servo_t){5, 450 - 360, 450, M_PI, 0}},
     left_back = {(servo_t){0, 294 - 180, 294 + 180, -M_PI_2, M_PI_2}, (servo_t){1, 76, 76 + 360, M_PI_2, -M_PI_2}, (servo_t){2, 92, 92 + 360, 0, M_PI}};
 
@@ -41,13 +41,13 @@ leg right_front = {(servo_t){9, 248 - 180, 248 + 180, M_PI_2, -M_PI_2}, (servo_t
 // 4- down 430
 // 5- down 450
 // 6- mid 272
-// 7- down 96
-// 8- down 100
+// 7- down 68
+// 8- down 96
 // 9- mid 248
 // 10- down 456
 // 11- down 458
 
-constexpr quaternion offset = {0, 0.036672f, 0.0434685f, FOOT_RADIUS_M + .05 * M_SQRT2};
+constexpr quaternion offset = {0.0f, 0.036672f, 0.0434685f, 0.0f};
 
 Robot robot(right_front, left_front, right_back, left_back, offset, UPPER_LEN_M, LOWER_LEN_M, FOOT_RADIUS_M, SHOULDER_OFFSET_M);
 
@@ -77,12 +77,13 @@ void setup()
   pwm.setOscillatorFrequency(27000000);
   pwm.setPWMFreq(50);
 
-  // xTaskCreate(runGyro, "Gyro Task", 10000, NULL, 1, &gyroTask);
+  xTaskCreate(runGyro, "Gyro Task", 10000, NULL, 1, &gyroTask);
   // xTaskCreate(robot.process, "Robot Task", 10000, NULL, 1, &robotTask);
-  robot.m_right_back = robot.m_right_back.offset;
-  robot.m_right_front = robot.m_right_front.offset;
-  robot.m_left_back = robot.m_left_back.offset;
-  robot.m_left_front = robot.m_left_front.offset;
+
+  // robot.correction = (euler){0, -M_PI / 8.0f, 0};
+
+  // for (leg *cur_leg : robot.legs)
+  //   *cur_leg = cur_leg->offset;
 }
 
 #ifdef SERVO_TESTING
@@ -109,7 +110,7 @@ void loop()
     Serial.printf("Servo %d set to %d\n", servo_testing, pulse);
   }
 #else
-  // robot.process();
+  robot.process();
 #endif
 }
 
@@ -127,6 +128,32 @@ void runGyro(void *args)
   if (!bno08x.enableReport(SH2_ROTATION_VECTOR))
     Serial.println("Could not enable rotation vector");
 
+  // while (1)
+  // {
+
+  //   //   robot.correction = (euler){0.0f, -M_PI / 16.0f, 0.0f};
+  //   //   delay(2000);
+  //   //   robot.correction = (euler){0.0f, M_PI / 16.0f, 0.0f};
+  //   //   delay(2000);
+
+  //   // robot.correction = (euler){0.0f, 0.0f, 0.0f};
+  //   float target = M_PI / 6.0f;
+  //   int time = 500;
+  //   float increment = .01;
+  //   unsigned delay_time = time * increment;
+
+  //   for (float i = -target; i <= target; i += target * increment)
+  //   {
+  //     robot.correction = (euler){0.0f, i, 0.0f};
+  //     delay(delay_time);
+  //   }
+  //   for (float i = target; i >= -target; i -= target * increment)
+  //   {
+  //     robot.correction = (euler){0.0f, i, 0.0f};
+  //     delay(delay_time);
+  //   }
+  // }
+
   while (1)
   {
     if (bno08x.wasReset())
@@ -143,10 +170,18 @@ void runGyro(void *args)
     {
     case SH2_ROTATION_VECTOR:
       sh2_RotationVectorWAcc val = bno08x_value.un.rotationVector;
-      robot.orientation = (quaternion){val.real, val.i, val.j, val.k};
-      euler eu = robot.orientation;
+      euler eu = (quaternion){val.real, val.i, val.j, val.k};
       eu = {0.0f, -eu.pitch, eu.roll};
-      robot.correction = (quaternion)eu * robot.orientation;
+      robot.orientation = eu;
+      euler eu2 = robot.correction;
+      robot.correction = (euler){0.0f, MAX(MIN(eu2.pitch + eu.pitch / M_PI, M_PI_2), -M_PI_2), MAX(MIN(eu2.roll + eu.roll / M_PI, M_PI_2), -M_PI_2)};
+      robot.relax = fabsf(eu.pitch) > M_PI_2 || fabsf(eu.roll) > M_PI_2;
+      Serial.printf("%f, %f\n", eu.pitch, eu.roll);
+      delay(20);
+
+      // printEuler(eu);
+
+      // robot.correction = (quaternion)eu * robot.correction;
 
       // rotation = eulerToQuaternion(eu);
 

@@ -5,10 +5,12 @@ class Robot
     const unsigned cycle_time = 600U;
 
 public:
-    quaternion orientation, correction;
+    quaternion orientation = {}, correction = {1.0f};
     leg m_right_front, m_left_front, m_right_back, m_left_back;
     leg *legs[4] = {&m_right_front, &m_left_back, &m_left_front, &m_right_back};
     float v_x, v_y, v_yaw; // velocities in m/s or rad/s
+
+    bool relax;
 
     Robot(leg right_front, leg left_front, leg right_back, leg left_back, quaternion leg_offset, float upper_leg_len, float lower_leg_len, float foot_radius, float shoulder_offset)
         : m_right_front{right_front}, m_left_front{left_front}, m_right_back{right_back}, m_left_back{left_back}
@@ -45,18 +47,23 @@ public:
             for (leg *cur_leg : legs)
             {
                 pos = {};
-                if (v_x || v_y || v_yaw) // check if there is a velocity
-                {
-                    t = (float)((current_time + i * cycle_time / 4) % cycle_time) / cycle_time; // get current time from 0 to 1
-                    float path_x = v_x - v_yaw * cur_leg->offset.j, path_y = v_y + v_yaw * cur_leg->offset.i;
-                    float path_radius = (path_x + path_y) * cycle_time * M_SQRT2 * .125f; // speed m * cycle time / (4 * sqrt(2))
-                    pos.i = cur_leg->offset.i + path_x * path_radius * cosf(2 * M_PI * t);
-                    pos.j = cur_leg->offset.j + path_y * path_radius * cosf(2 * M_PI * t);
-                    pos.k = cur_leg->offset.k - 0.035f * 0.5f * (sinf(2 * M_PI * t) - 0.25f * cosf(4 * M_PI * t) + 0.75f);
-                }
+                if (relax)
+                    *cur_leg = false;
                 else
-                    pos = cur_leg->offset;
-                *cur_leg = correction * pos * !correction;
+                {
+                    if (v_x || v_y || v_yaw) // check if there is a velocity
+                    {
+                        t = (float)((current_time + i * cycle_time / 4) % cycle_time) / cycle_time; // get current time from 0 to 1
+                        float path_x = v_x - v_yaw * cur_leg->offset.j, path_y = v_y + v_yaw * cur_leg->offset.i;
+                        float path_radius = (path_x + path_y) * cycle_time * M_SQRT2 * .125f; // speed m * cycle time / (4 * sqrt(2))
+                        pos.i = cur_leg->offset.i + path_x * path_radius * cosf(2 * M_PI * t);
+                        pos.j = cur_leg->offset.j + path_y * path_radius * cosf(2 * M_PI * t);
+                        pos.k = cur_leg->offset.k - 0.035f * 0.5f * (sinf(2 * M_PI * t) - 0.25f * cosf(4 * M_PI * t) + 0.75f);
+                    }
+                    else
+                        pos = cur_leg->offset;
+                    *cur_leg = correction * pos * !correction;
+                }
             }
             current_time = millis() - start_time;
             delay(2);

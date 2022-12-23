@@ -73,42 +73,16 @@ quaternion::operator euler() const
 
 void printQuaternion(quaternion q)
 {
-    Serial.print(q.w);
-    Serial.print(",");
-    Serial.print(q.i);
-    Serial.print(",");
-    Serial.print(q.j);
-    Serial.print(",");
-    Serial.print(q.k);
+    Serial.printf("%f, %f, %f, %f\n", q.w, q.i, q.j, q.k);
 }
 
 void printVector(quaternion q)
 {
-    Serial.print(q.i);
-    Serial.print(",");
-    Serial.print(q.j);
-    Serial.print(",");
-    Serial.print(q.k);
+    Serial.printf("%f, %f, %f\n", q.i, q.j, q.k);
 }
 
 void printEuler(euler e)
 {
-    Serial.print(e.yaw);
-    Serial.print(",");
-    Serial.print(e.pitch);
-    Serial.print(",");
-    Serial.print(e.roll);
-}
-
-quaternion eulerToQuaternion(euler e)
-{
-    float cr = cosf(e.roll * 0.5f);
-    float sr = sinf(e.roll * 0.5f);
-    float cp = cosf(e.pitch * 0.5f);
-    float sp = sinf(e.pitch * 0.5f);
-    float cy = cosf(e.yaw * 0.5f);
-    float sy = sinf(e.yaw * 0.5f);
-
-    return (quaternion){cr * cp * cy + sr * sp * sy, sr * cp * cy - cr * sp * sy, cr * sp * cy + sr * cp * sy, cr * cp * sy - sr * sp * cy};
+    Serial.printf("%f, %f, %f\n", e.roll, e.pitch, e.yaw);
 }
 #endif

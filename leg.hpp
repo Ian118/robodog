@@ -18,8 +18,12 @@ struct servo_t
     float max_val;
     void operator=(const float pos)
     {
-        Serial.printf("Servo %d to %d\n", port, (unsigned)MAX(min_pulse, MIN(max_pulse, (max_pulse - min_pulse) / (max_val - min_val) * (pos - min_val) + min_pulse)));
         pwm.setPWM(port, 0, (unsigned)MAX(min_pulse, MIN(max_pulse, (max_pulse - min_pulse) / (max_val - min_val) * (pos - min_val) + min_pulse)));
+    }
+    void operator=(const bool on)
+    {
+        if (!on)
+            pwm.setPWM(port, 0, 0);
     }
 };
 
@@ -31,7 +35,7 @@ struct leg
 
     void operator=(const quaternion &q)
     {
-        float x = q.i - offset.i, y = q.j - offset.j + shoulder_offset, z = q.k - foot_radius;
+        float x = q.i - offset.i, y = q.j - offset.j + shoulder_offset, z = sqrtf(upper_leg_len * upper_leg_len + lower_leg_len * lower_leg_len) + q.k;
 
         float z1 = z;
         float shoulder_theta = atan2f(z, y) - acosf(shoulder_offset / sqrtf(z * z + y * y));
@@ -43,8 +47,15 @@ struct leg
         shoulder = shoulder_theta;
         upper_leg = upper_theta;
         lower_leg = lower_theta;
-        Serial.printf("%f, %f, %f, %f\n", atan2f(z1, y), -acosf(shoulder_offset / sqrtf(z1 * z1 + y * y)), z1, y);
-        Serial.printf("%f, %f, %f; %f, %f, %f\n", x, y, z, shoulder_theta, upper_theta, lower_theta);
+    }
+    void operator=(const bool on)
+    {
+        if (!on)
+        {
+            shoulder = false;
+            upper_leg = false;
+            lower_leg = false;
+        }
     }
 };
 
