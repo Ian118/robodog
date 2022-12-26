@@ -80,10 +80,13 @@ void setup()
   xTaskCreate(runGyro, "Gyro Task", 10000, NULL, 1, &gyroTask);
   // xTaskCreate(robot.process, "Robot Task", 10000, NULL, 1, &robotTask);
 
-  // robot.correction = (euler){0, -M_PI / 8.0f, 0};
-
   // for (leg *cur_leg : robot.legs)
-  //   *cur_leg = cur_leg->offset;
+  //   *cur_leg = (quaternion){0.0f, cur_leg->offset.i + .005, cur_leg->offset.j, cur_leg->offset.k - .035f};
+  // delay(100);
+  // for (leg *cur_leg : robot.legs)
+  //   *cur_leg = false;
+  // while (1)
+  //   ;
 }
 
 #ifdef SERVO_TESTING
@@ -117,10 +120,13 @@ void loop()
 void data_receive(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
   memcpy(&stick_state, incomingData, sizeof(stick_state));
-  Serial.print(stick_state.horizontal);
-  Serial.print(", ");
-  Serial.println(stick_state.vertical);
-  robot.v_x = abs((signed)stick_state.vertical - 512) > 10 ? -((signed)stick_state.vertical - 512) / 512.0f : 0.0f;
+  // Serial.print(stick_state.horizontal);
+  // Serial.print(", ");
+  // Serial.println(stick_state.vertical);
+  float fwd = ((signed)stick_state.vertical - 512) / 512.0f;
+  fwd = -fwd;
+  robot.v_x = abs(fwd) > .02 ? 0.05f * fwd : 0.0f; // Max at 0.25 m/s
+  // Serial.println(robot.v_x);
 }
 
 void runGyro(void *args)
@@ -174,9 +180,8 @@ void runGyro(void *args)
       eu = {0.0f, -eu.pitch, eu.roll};
       robot.orientation = eu;
       euler eu2 = robot.correction;
-      robot.correction = (euler){0.0f, MAX(MIN(eu2.pitch + eu.pitch / M_PI, M_PI_2), -M_PI_2), MAX(MIN(eu2.roll + eu.roll / M_PI, M_PI_2), -M_PI_2)};
-      robot.relax = fabsf(eu.pitch) > M_PI_2 || fabsf(eu.roll) > M_PI_2;
-      Serial.printf("%f, %f\n", eu.pitch, eu.roll);
+      robot.correction = (euler){0.0f, MAX(MIN(eu2.pitch + eu.pitch / M_PI, M_PI_4), -M_PI_4), MAX(MIN(eu2.roll + eu.roll / M_PI, M_PI_4), -M_PI_4)};
+      robot.relax = fabsf(eu.pitch) > M_PI_4 || fabsf(eu.roll) > M_PI_4;
       delay(20);
 
       // printEuler(eu);
