@@ -1,5 +1,6 @@
 #include <esp_now.h>
 #include <WiFi.h>
+#include <BluetoothSerial.h>
 
 #include <Adafruit_PWMServoDriver.h>
 
@@ -17,15 +18,20 @@
 Adafruit_BNO08x bno08x;
 sh2_SensorValue_t bno08x_value;
 
-TaskHandle_t gyroTask, robotTask;
+TaskHandle_t gyroTask, bluetoothTask;
 
-struct js_state
+BluetoothSerial bt;
+
+struct
 {
   unsigned vertical;
   unsigned horizontal;
+  bool right;
+  bool down;
+  bool left;
+  bool up;
+  bool sel;
 } stick_state;
-
-float fwd;
 
 // #define SERVO_TESTING
 
@@ -54,6 +60,7 @@ Robot robot(right_front, left_front, right_back, left_back, offset, UPPER_LEN_M,
 void setup()
 {
   Serial.begin(115200);
+  bt.begin("Robodog");
   WiFi.mode(WIFI_STA);
 
   if (esp_now_init() != ESP_OK)
@@ -63,30 +70,15 @@ void setup()
   else
     esp_now_register_recv_cb(data_receive);
 
-  delay(200);
-
-  if (!bno08x.begin_I2C())
-  {
-    Serial.println("Failed to find BNO08x chip");
-    while (1)
-      delay(10);
-  }
-  Serial.println("BNO08x Found!");
+  while (!bno08x.begin_I2C())
+    delay(1000);
 
   pwm.begin();
   pwm.setOscillatorFrequency(27000000);
   pwm.setPWMFreq(50);
 
   xTaskCreate(runGyro, "Gyro Task", 10000, NULL, 1, &gyroTask);
-  // xTaskCreate(robot.process, "Robot Task", 10000, NULL, 1, &robotTask);
-
-  // for (leg *cur_leg : robot.legs)
-  //   *cur_leg = (quaternion){0.0f, cur_leg->offset.i + .005, cur_leg->offset.j, cur_leg->offset.k - .035f};
-  // delay(100);
-  // for (leg *cur_leg : robot.legs)
-  //   *cur_leg = false;
-  // while (1)
-  //   ;
+  xTaskCreate(runBluetooth, "Bluetooth Task", 10000, NULL, 2, &gyroTask);
 }
 
 #ifdef SERVO_TESTING
@@ -120,45 +112,16 @@ void loop()
 void data_receive(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
   memcpy(&stick_state, incomingData, sizeof(stick_state));
-  // Serial.print(stick_state.horizontal);
-  // Serial.print(", ");
-  // Serial.println(stick_state.vertical);
-  float fwd = ((signed)stick_state.vertical - 512) / 512.0f;
-  fwd = -fwd;
-  robot.v_x = abs(fwd) > .02 ? 0.05f * fwd : 0.0f; // Max at 0.25 m/s
-  // Serial.println(robot.v_x);
+  float fwd = -((signed)stick_state.vertical - 512) / 512.0f;
+  float right = ((signed)stick_state.horizontal - 512) / 512.0f;
+  robot.v_x = abs(fwd) > .02 ? 0.05f * fwd : 0.0f;     // Max at 0.25 m/s
+  robot.v_y = abs(right) > .02 ? 0.05f * right : 0.0f; // Max at 0.25 m/s
 }
 
 void runGyro(void *args)
 {
   if (!bno08x.enableReport(SH2_ROTATION_VECTOR))
     Serial.println("Could not enable rotation vector");
-
-  // while (1)
-  // {
-
-  //   //   robot.correction = (euler){0.0f, -M_PI / 16.0f, 0.0f};
-  //   //   delay(2000);
-  //   //   robot.correction = (euler){0.0f, M_PI / 16.0f, 0.0f};
-  //   //   delay(2000);
-
-  //   // robot.correction = (euler){0.0f, 0.0f, 0.0f};
-  //   float target = M_PI / 6.0f;
-  //   int time = 500;
-  //   float increment = .01;
-  //   unsigned delay_time = time * increment;
-
-  //   for (float i = -target; i <= target; i += target * increment)
-  //   {
-  //     robot.correction = (euler){0.0f, i, 0.0f};
-  //     delay(delay_time);
-  //   }
-  //   for (float i = target; i >= -target; i -= target * increment)
-  //   {
-  //     robot.correction = (euler){0.0f, i, 0.0f};
-  //     delay(delay_time);
-  //   }
-  // }
 
   while (1)
   {
@@ -180,117 +143,30 @@ void runGyro(void *args)
       eu = {0.0f, -eu.pitch, eu.roll};
       robot.orientation = eu;
       euler eu2 = robot.correction;
-      robot.correction = (euler){0.0f, MAX(MIN(eu2.pitch + eu.pitch / M_PI, M_PI_4), -M_PI_4), MAX(MIN(eu2.roll + eu.roll / M_PI, M_PI_4), -M_PI_4)};
+      // robot.correction = (euler){0.0f, MAX(MIN(eu2.pitch + eu.pitch / M_PI, M_PI_4), -M_PI_4), MAX(MIN(eu2.roll + eu.roll / M_PI, M_PI_4), -M_PI_4)};
       robot.relax = fabsf(eu.pitch) > M_PI_4 || fabsf(eu.roll) > M_PI_4;
       delay(20);
-
-      // printEuler(eu);
-
-      // robot.correction = (quaternion)eu * robot.correction;
-
-      // rotation = eulerToQuaternion(eu);
-
-      // quaternion q_prime = {q.w, -q.i, -q.j, -q.k}; // conjugate
-      // float theta = atan2f(sqrtf(q.i * q.i + q.j * q.j + q.k * q.k), q.w);
-      // quaternion q_new = (quaternion){cos(0.5f * theta), 0, sin(0.5f * theta), 0};
-      // quaternion q_new_prime = {q_new.w, -q_new.i, -q_new.j, -q_new.k};
-      // quaternion vx = {0, 1, 0, 0};                   // 0, x, y, z
-      // quaternion vy = {0, 0, 1, 0};                   // 0, x, y, z
-      // quaternion vz = {0, 0, 0, 1};                   // 0, x, y, z
-      // quaternion vx_prime = q_new * vx * q_new_prime; // new position
-      // quaternion vy_prime = q_new * vy * q_new_prime; // new position
-      // quaternion vz_prime = q_new * vz * q_new_prime; // new position
-
-      // quaternion fl = {0.0f, 0.036672f, 0.0434685f, 0.08f};
-      // quaternion fr = {0.0f, 0.036672f, -0.0434685f, 0.08f};
-      // quaternion bl = {0.0f, -0.036672f, 0.0434685f, 0.08f};
-      // quaternion br = {0.0f, -0.036672f, -0.0434685f, 0.08f};
-
-      // printEuler(q);
-
-      // printVector(q * fl * q_prime);
-      // Serial.print(" ");
-      // printVector(q * fr * q_prime);
-      // Serial.print(" ");
-      // printVector(q * bl * q_prime);
-      // Serial.print(" ");
-      // printVector(q * br * q_prime);
-      // Serial.println();
-
-      // float roll = 2.0f * atan2f(val.real * val.i + val.j * val.k, 1.0f - 2.0f * (val.i * val.i + val.j * val.j));
-      // float sinp = 2.0f * (val.real * val.j - val.k * val.i);
-      // float pitch = abs(sinp) >= 1 ? copysignf(M_PI_2, sinp) : asinf(sinp);
-      // float yaw = atan2f(val.real * val.k + val.i * val.j, 1.0f - 2.0f * (val.j * val.j + val.k * val.k));
-
-      // float roll = atan2(2 * (r.real * r.i + r.j * r.k), 1 - 2 * (r.i * r.i + r.j * r.j));
-      // Serial.print(roll / M_PI);
-      // Serial.println("PI");
-      // if (roll > 0)
-      //   pwm.setPWM(0, 0, RAD_TO_SERVO(roll));
-      // break;
     }
   }
 }
 
-// void runPWM(void *args)
-// {
-//   // left_back.move_to(0, SHOULDER_OFFSET_M, .1);
-//   // vTaskDelete(pwmTask);
+void runBluetooth(void *args)
+{
+  struct data
+  {
+    float x_offset, y_offset, shoulder, upper, lower;
+  };
 
-//   unsigned long start_time, current_time;
-//   float x, y, z, t;
-
-//   const unsigned cycle_time = 600U;
-//   unsigned i = 0;
-//   const float nominal_path_radius = .035f;
-//   float path_radius = nominal_path_radius;
-//   quaternion rotation_conjugate, current;
-
-//   leg legs[] = {right_front, left_back, left_front, right_back};
-
-//   start_time = millis();
-//   while (1)
-//   {
-//     i = 0;
-//     path_radius = nominal_path_radius * fwd;
-//     for (leg cur_leg : legs)
-//     {
-//       t = (float)((current_time + i * cycle_time / 4U) % cycle_time) / cycle_time;
-//       x = path_radius * cosf(2 * M_PI * t);
-//       z = -abs(path_radius) * 0.5f * (sinf(2 * M_PI * t) - 0.25f * cosf(4 * M_PI * t) + 0.75f);
-//       y = SHOULDER_OFFSET_M;
-
-//       current = {0, (i % 2 == 1 ? -1 : 1) * 0.036672f, (i == 1 || i == 2 ? -1 : 1) * 0.0434685f, 0.095f};
-//       current = rotation * current * (quaternion){rotation.w, -rotation.i, -rotation.j, -rotation.k};
-//       current = {0, current.i - (i % 2 == 1 ? -1 : 1) * 0.036672f, current.j - (i == 1 || i == 2 ? -1 : 1) * 0.0434685f, current.k};
-//       x += current.i;
-//       y += current.j;
-//       z += current.k;
-//       // Serial.print(x);
-//       // Serial.print(" ");
-//       // Serial.print(y);
-//       // Serial.print(" ");
-//       // Serial.print(z);
-//       // cur_leg.move_to(current.i - (i % 2 == 1 ? -1 : 1) * 0.036672f, current.j - (i == 1 || i == 2 ? -1 : 1) * 0.0434685f, current.k);
-//       // printVector({0, current.i - (i % 2 == 1 ? -1 : 1) * 0.036672f, current.j - (i == 1 || i == 2 ? -1 : 1) * 0.0434685f, current.k});
-//       // Serial.print(";");
-
-//       // cur_leg.move_to(x, y, z);
-
-//       // cur_leg.move_to(x, y, z);
-//       i++;
-//     }
-//     // Serial.print("Quaternion: ");
-//     // Serial.print(rotation.w);
-//     // Serial.print(", ");
-//     // Serial.print(rotation.i);
-//     // Serial.print(", ");
-//     // Serial.print(rotation.j);
-//     // Serial.print(", ");
-//     // Serial.println(rotation.k);
-
-//     // Serial.println();
-//     current_time = millis() - start_time;
-//     delay(2);
-//   }
-// }
+  while (1)
+  {
+    for (leg *cur_leg : robot.legs)
+    {
+      uint8_t foo[sizeof(data)];
+      data d = (data){cur_leg->offset.i, cur_leg->offset.j, cur_leg->shoulder_theta, cur_leg->upper_theta, cur_leg->lower_theta};
+      Serial.printf("%f,%f,%f,%f,%f\n", cur_leg->offset.i, cur_leg->offset.j, cur_leg->shoulder_theta, cur_leg->upper_theta, cur_leg->lower_theta);
+      memcpy(foo, &d, sizeof(d));
+      bt.write(foo, sizeof(foo));
+    }
+    delay(500);
+  }
+}

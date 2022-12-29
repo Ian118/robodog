@@ -32,17 +32,17 @@ struct leg
     struct servo_t shoulder, upper_leg, lower_leg;
     quaternion offset;
     float upper_leg_len, lower_leg_len, foot_radius, shoulder_offset; // in meters
+    float shoulder_theta, upper_theta, lower_theta;
 
     void operator=(const quaternion &q)
     {
-        float x = q.i - offset.i, y = q.j - offset.j + shoulder_offset, z = sqrtf(upper_leg_len * upper_leg_len + lower_leg_len * lower_leg_len) + q.k;
+        float x = q.i - offset.i, y = q.j - offset.j + shoulder_offset, z = sqrtf(upper_leg_len * upper_leg_len + lower_leg_len * lower_leg_len) + q.k - foot_radius;
 
-        float z1 = z;
-        float shoulder_theta = atan2f(z, y) - acosf(shoulder_offset / sqrtf(z * z + y * y));
+        shoulder_theta = atan2f(z, y) - acosf(shoulder_offset / sqrtf(z * z + y * y));
         z = sqrtf(z * z + y * y - shoulder_offset * shoulder_offset);
         float d2 = x * x + z * z;
-        float upper_theta = atan2f(z, x) - acosf((upper_leg_len * upper_leg_len + d2 - lower_leg_len * lower_leg_len) / (2.0 * upper_leg_len * sqrtf(d2)));
-        float lower_theta = M_PI - acosf((upper_leg_len * upper_leg_len + lower_leg_len * lower_leg_len - d2) / (2.0 * upper_leg_len * lower_leg_len));
+        upper_theta = M_PI - atan2f(z, x) - acosf((upper_leg_len * upper_leg_len + d2 - lower_leg_len * lower_leg_len) / (2.0f * upper_leg_len * sqrtf(d2)));
+        lower_theta = M_PI - acosf((upper_leg_len * upper_leg_len + lower_leg_len * lower_leg_len - d2) / (2.0f * upper_leg_len * lower_leg_len));
 
         shoulder = shoulder_theta;
         upper_leg = upper_theta;
