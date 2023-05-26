@@ -5,7 +5,7 @@ class Robot
     const unsigned cycle_time = 2000U;
 
 public:
-    quaternion orientation = {}, correction = {1.0f};
+    quaternion orientation = {1.0f}, correction = {1.0f};
     leg m_right_front, m_left_front, m_right_back, m_left_back;
     leg *legs[4] = {&m_right_front, &m_left_back, &m_left_front, &m_right_back};
     float v_x = 0.0f, v_y = 0.0f, v_yaw = 0.0f; // velocities in m/s or rad/s
@@ -55,7 +55,6 @@ public:
                     if (v_x || v_y || v_yaw) // check if there is a velocity
                     {
                         t = (float)((current_time + i * cycle_time / 4) % cycle_time) * 4.0f / cycle_time; // get current time from 0 to 1
-                        // float path_x = v_x - v_yaw * cur_leg->offset.j, path_y = v_y + v_yaw * cur_leg->offset.i;
                         float path_x = v_x * cycle_hz, path_y = v_y * cycle_hz;
                         if (t <= 1.0f)
                         {
@@ -78,6 +77,11 @@ public:
                         // pos.i = cur_leg->offset.i + path_x * path_radius * cosf(2 * M_PI * t);
                         // pos.j = cur_leg->offset.j + path_y * path_radius * cosf(2 * M_PI * t);
                         // pos.k = cur_leg->offset.k - 0.035f * 0.5f * (sinf(2 * M_PI * t) - 0.25f * cosf(4 * M_PI * t) + 0.75f);
+                        *cur_leg = pos;
+                    }
+                    else if (orientation.w != 1.0f)
+                    {
+                        pos = !orientation * cur_leg->offset * orientation;
                         *cur_leg = pos;
                     }
                     else
