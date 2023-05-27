@@ -1,0 +1,17 @@
+name: Format C++
+on:
+  push:
+    branches: [main]
+defaults:
+  run:
+    shell: bash
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: find . -regex '.*\.\(cpp\|hpp\|c\|h\|ino\)' | xargs clang-format -i -style Google
+      - run: git config user.name github-actions
+      - run: git config user.email github-actions@github.com
+      - run: git diff --quiet && git diff --staged --quiet || git commit -am "Formatted C++ files"
+      - run: git push
